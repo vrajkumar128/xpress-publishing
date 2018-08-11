@@ -10,7 +10,7 @@ const {
 // Create artistsRouter
 const artistsRouter = express.Router();
 
-// Handle :artistId router parameter
+// Handle :artistId URL parameter
 artistsRouter.param('artistId', async (req, res, next, id) => {
   try {
     const artist = await getFromDatabaseById('artist', id);
@@ -49,7 +49,7 @@ artistsRouter.get('/', async (req, res, next) => {
 });
 
 // Get a single artist
-artistsRouter.get('/:artistId', async (req, res) => {
+artistsRouter.get('/:artistId', (req, res) => {
   const artist = req.artist;
   res.send({ artist });
 });

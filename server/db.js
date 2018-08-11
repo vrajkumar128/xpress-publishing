@@ -1,6 +1,6 @@
 const sqlite3 = require('sqlite3');
 const db = new sqlite3.Database(process.env.TEST_DATABASE || './database.sqlite');
-const snakeCaseKey = require('../src/utils/helpers');
+const { toSnakeCase } = require('../src/utils/helpers');
 
 // Get all rows from the given table
 const getAllFromDatabase = (table) => (
@@ -28,7 +28,7 @@ const getFromDatabaseById = (table, id) => (
 
 // Add the given data to the given table
 const addToDatabase = (table, data) => {
-  const columns = Object.keys(data).map(key => snakeCaseKey(key)); 
+  const columns = Object.keys(data).map(key => toSnakeCase(key)); 
   const stringifiedValues = Object.values(data).map(val => `"${val}"`);
 
   return new Promise((res, rej) => {
@@ -47,9 +47,9 @@ const addToDatabase = (table, data) => {
 // Update the row with the given ID in the given table with the given data
 const updateInstanceInDatabase = (table, data, id) => {
   const pairs = Object.keys(data).map(key => 
-    `${snakeCaseKey(key)} = "${data[key]}"`);
+    `${toSnakeCase(key)} = "${data[key]}"`);
 
-  return new Promise(res => {
+  return new Promise((res, rej) => {
     db.run(`UPDATE ${table} SET ${pairs} WHERE id=${id};`, (err) => {
       if (err) {
         return rej(err);
@@ -66,7 +66,7 @@ const updateInstanceInDatabase = (table, data, id) => {
 const deleteFromDatabaseById = (table, id) => (
   new Promise((res, rej) => {
     if (table === 'artist') {
-      return db.run(`UPDATE Artist SET is_currently_employed = 0 WHERE id=${id};`, (err) => {
+      db.run(`UPDATE Artist SET is_currently_employed = 0 WHERE id=${id};`, (err) => { // Set an artist to unemployed
         if (err) {
           return rej(err);
         }
@@ -76,10 +76,20 @@ const deleteFromDatabaseById = (table, id) => (
         });
       });
     }
-      
-    db.run(`DELETE FROM ${table} WHERE id=${id};`, (err) => {
-      err ? rej(err) : res();
-    });
+    
+    if (table === 'series') {
+      db.get(`SELECT COUNT(*) AS 'count' FROM Issue WHERE series_id=${id};`, (err, row) => { // Check if series has any related issues
+        if (err) {
+          rej(err);
+        } else if (row.count > 0) {
+          res(row.count);
+        } else {
+          db.run(`DELETE FROM Series WHERE id=${id};`, (err) => {
+            err ? rej(err) : res();
+          });
+        }
+      });
+    }
   })
 );
 
