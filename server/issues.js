@@ -30,8 +30,9 @@ issuesRouter.param('issueId', async (req, res, next, id) => {
 const validateIssue = (req, res, next) => {
   const { issue } = req.body;
 
-  if (issue && issue.name && issue.dateOfBirth
-    && issue.biography) {
+  if (issue && issue.name && issue.issueNumber
+    && issue.publicationDate && issue.artistId) {
+    issue.seriesId = req.series.id;
     next();
   } else {
     res.status(400).send("Submitted issue contains missing field(s)");
@@ -41,17 +42,11 @@ const validateIssue = (req, res, next) => {
 // Get all issues
 issuesRouter.get('/', async (req, res, next) => {
   try {
-    const issues = await getAllFromDatabase('issue');
+    const issues = await getAllFromDatabase('issue', req.series.id);
     res.send({ issues });
   } catch (err) {
     next(err);
   }
-});
-
-// Get a single issue
-issuesRouter.get('/:issueId', (req, res) => {
-  const issue = req.issue;
-  res.send({ issue });
 });
 
 // Create a new issue
@@ -77,8 +72,8 @@ issuesRouter.put('/:issueId', validateIssue, async (req, res, next) => {
 // Delete an issue
 issuesRouter.delete('/:issueId', async (req, res, next) => {
   try {
-    const issue = await deleteFromDatabaseById('issue', req.issue.id);
-    res.send({ issue });
+    await deleteFromDatabaseById('issue', req.issue.id);
+    res.sendStatus(204);
   } catch (err) {
     next(err);
   }

@@ -3,17 +3,31 @@ const db = new sqlite3.Database(process.env.TEST_DATABASE || './database.sqlite'
 const { toSnakeCase } = require('../src/utils/helpers');
 
 // Get all rows from the given table
-const getAllFromDatabase = (table) => (
+const getAllFromDatabase = (table, id) => (
   new Promise((res, rej) => {
-    if (table === 'artist') {
-      return db.all(`SELECT * FROM Artist WHERE is_currently_employed=1;`, (err, rows) => {
-        err ? rej(err) : res(rows);
-      });
-    }
+    const tableSwitch = {
+      artist: () => {
+        db.all(`SELECT * FROM Artist WHERE is_currently_employed=1;`, (err, rows) => {
+          err ? rej(err) : res(rows);
+        });
+      },
 
-    db.all(`SELECT * FROM ${table};`, (err, rows) => {
-      err ? rej(err) : res(rows);
-    });
+      issue: () => {
+        db.all(`SELECT * FROM Issue WHERE series_id=${id};`, (err, rows) => {
+          err ? rej(err) : res(rows);
+        });
+      },
+
+      default: () => {
+        db.all(`SELECT * FROM ${table};`, (err, rows) => {
+          err ? rej(err) : res(rows);
+        });
+      }
+    };
+
+    tableSwitch[table] 
+      ? tableSwitch[table]()
+      : tableSwitch['default']();
   })
 );
 
@@ -28,7 +42,7 @@ const getFromDatabaseById = (table, id) => (
 
 // Add the given data to the given table
 const addToDatabase = (table, data) => {
-  const columns = Object.keys(data).map(key => toSnakeCase(key)); 
+  const columns = Object.keys(data).map(key => toSnakeCase(key));
   const stringifiedValues = Object.values(data).map(val => `"${val}"`);
 
   return new Promise((res, rej) => {
@@ -65,31 +79,43 @@ const updateInstanceInDatabase = (table, data, id) => {
 // Delete the row with the given ID from the given table
 const deleteFromDatabaseById = (table, id) => (
   new Promise((res, rej) => {
-    if (table === 'artist') {
-      db.run(`UPDATE Artist SET is_currently_employed = 0 WHERE id=${id};`, (err) => { // Set an artist to unemployed
-        if (err) {
-          return rej(err);
-        }
-
-        db.get(`SELECT * FROM Artist WHERE id=${id};`, (err, row) => {
-          err ? rej(err) : res(row);
-        });
-      });
-    }
-    
-    if (table === 'series') {
-      db.get(`SELECT COUNT(*) AS 'count' FROM Issue WHERE series_id=${id};`, (err, row) => { // Check if series has any related issues
-        if (err) {
-          rej(err);
-        } else if (row.count > 0) {
-          res(row.count);
-        } else {
-          db.run(`DELETE FROM Series WHERE id=${id};`, (err) => {
-            err ? rej(err) : res();
+    const tableSwitch = {
+      artist: () => {
+        db.run(`UPDATE Artist SET is_currently_employed = 0 WHERE id=${id};`, (err) => { // Set an artist to unemployed
+          if (err) {
+            return rej(err);
+          }
+  
+          db.get(`SELECT * FROM Artist WHERE id=${id};`, (err, row) => {
+            err ? rej(err) : res(row);
           });
-        }
-      });
-    }
+        });
+      },
+      
+      series: () => {
+        db.get(`SELECT COUNT(*) AS 'count' FROM Issue WHERE series_id=${id};`, (err, row) => { // Check if series has any related issues
+          if (err) {
+            rej(err);
+          } else if (row.count > 0) {
+            res(row.count);
+          } else {
+            db.run(`DELETE FROM Series WHERE id=${id};`, (err) => {
+              err ? rej(err) : res();
+            });
+          }
+        });
+      },
+      
+      default: () => {
+        db.run(`DELETE FROM ${table} WHERE id=${id};`, (err) => {
+          err ? rej(err) : res();
+        });
+      }
+    };
+
+    tableSwitch[table]
+      ? tableSwitch[table]()
+      : tableSwitch['default']();
   })
 );
 

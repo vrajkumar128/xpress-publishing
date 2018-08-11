@@ -76,8 +76,8 @@ seriesRouter.put('/:seriesId', validateSeries, async (req, res, next) => {
 // Delete a series
 seriesRouter.delete('/:seriesId', async (req, res, next) => {
   try {
-    const numIssues = await deleteFromDatabaseById('series', req.series.id);
-    numIssues > 0
+    const seriesIssues = await deleteFromDatabaseById('series', req.series.id);
+    seriesIssues
       ? res.status(400).send("Error: Series has related issue(s)")
       : res.sendStatus(204);
   } catch (err) {
@@ -87,6 +87,6 @@ seriesRouter.delete('/:seriesId', async (req, res, next) => {
 
 // Import and mount issuesRouter
 const issuesRouter = require('./issues');
-seriesRouter.use('/issues', issuesRouter);
+seriesRouter.use('/:seriesId/issues', issuesRouter);
 
 module.exports = seriesRouter;
